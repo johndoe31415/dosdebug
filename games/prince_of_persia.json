@@ -1,0 +1,18 @@
+{
+	"name": "Prince of Persia",
+	"md5": {
+		"filename":	"prince.exe",
+		"value": "c07484ea13ca8d0d0425626110626564"
+	},
+	"cheats": [
+		{
+			"name":		"Current health",
+			"changes": [
+				{
+					"mem":		"2139:0008",
+					"setvalue":	"05"
+				}
+			]
+		}
+	]
+}

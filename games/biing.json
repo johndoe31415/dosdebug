@@ -1,0 +1,18 @@
+{
+	"name": "Biing!",
+	"md5": {
+		"filename":	"bipro.exe",
+		"value": "7469c1b85df6d290e93f2f0dd6515ed0"
+	},
+	"cheats": [
+		{
+			"name":		"Money",
+			"changes": [
+				{
+					"mem":		"0x1b947c",
+					"setvalue":	"a0 86 01"
+				}
+			]
+		}
+	]
+}

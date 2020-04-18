@@ -1,0 +1,49 @@
+{
+	"name": "Dangerous Dave",
+	"md5": {
+		"filename":	"dave.exe",
+		"value": "10ac35dd6bc6314cd5caf08a4ffb4275"
+	},
+	"cheats": [
+		{
+			"name":		"Have three remaining lives",
+			"changes": [
+				{
+					"mem":		"2C5D:000E",
+					"setvalue":	"03"
+				}
+			]
+		},
+		{
+			"name":		"Have full jetpack",
+			"changes": [
+				{
+					"mem":		"2C68:0008",
+					"setvalue":	"3c",
+					"comment":	"Jetpack fill"
+				},
+				{
+					"mem":		"2be7:000a",
+					"setvalue":	"01",
+					"comment":	"Have Jetpack"
+				}
+			]
+		},
+		{
+			"name":		"Level 5",
+			"changes": [
+				{
+					"mem":		"2c5e:0004",
+					"setvalue":	"05",
+					"comment":	"Occurrence 1"
+				},
+				{
+					"mem":		"2c66:000a",
+					"setvalue":	"05",
+					"comment":	"Occurrence 2 (not needed)",
+					"active": false
+				}
+			]
+		}
+	]
+}

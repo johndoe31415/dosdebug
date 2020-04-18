@@ -1,0 +1,18 @@
+{
+	"name": "Ports of Call (US version)",
+	"md5": {
+		"filename":	"pocus.exe",
+		"value": "c6313bdfaa7d2e49daf93bf0012cf0a5"
+	},
+	"cheats": [
+		{
+			"name":		"Money",
+			"changes": [
+				{
+					"mem":		"0x3d236",
+					"setvalue":	"20 a1 07"
+				}
+			]
+		}
+	]
+}

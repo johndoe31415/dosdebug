@@ -1,0 +1,9 @@
+{
+	"inferior":		"./dosbox-0.74-3-dbg",
+	"run": true,
+	"break": [
+	],
+	"load": [
+		"DosBox.py"
+	]
+}
