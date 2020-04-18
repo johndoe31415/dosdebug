@@ -8,7 +8,9 @@ DOSBox, thereby allowing for breaks on read using hardware breakpoints
 ## Running this
   * Compile DOSBox in heavy debugging mode
   * Ensure that in the config file `autolock=false` is set
-  * Open dosbox through GDB: `gdb -x gdb_dosbox.conf ./dosbox-0.74-3-dbg`
+  * Open dosbox through pygdb: `pygdb dosbox.json` (alternatively and without
+    many of the functionality, directly run through gdb:
+    `gdb -x gdbinit_dosbox.conf ./dosbox-0.74-3-dbg`
 
 ## Hardware breakpoint (on read)
   * Press Alt-Pause to enter DOSBox debugger; then memdump whole image using
