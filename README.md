@@ -1,4 +1,4 @@
-# doscheats
+# doscheat
 This is a collections of tools I am using to cheat and reverse engineer DOS
 applications which run in DOSBox. In particular, it uses my
 [pygdb](https://github.com/johndoe31415/pygdb) frontend to GDB to hook into
@@ -25,6 +25,15 @@ DOSBox, thereby allowing for breaks on read using hardware breakpoints
 
 ## Enabling DOSBox debugger from gdb
   * `call DEBUG_EnableDebugger()`
+
+## Implemented gdb commands
+The gdb is enhanced when run through pygdb in the following ways:
+  * `gregs`: Print the DOS register set
+  * `gip`: Print the DOS instruction pointer in segment:address notation
+  * `ghexdump (addr) (len)`: Dump memory as hexdump starting from given address
+    for a specific length.
+  * `gbt`: Attempt to print a guest backtrace by doing stackframe unwinding.
+    Super dodgy, doesn't work entirely yet.
 
 ## License
 GNU GPL-3.
