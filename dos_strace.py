@@ -81,10 +81,12 @@ class Stracer():
 		return options.get(value, "unknown (0x%x)" % (value))
 
 	def _handle_3c(self, insn, follow_insn):
-		if follow_insn["cf"] == 0:
-			results = (("handle", str(insn["eax"])), )
-		else:
-			results = (("error", self._decode_select(self._FILE_ERROR_CODES, insn["eax"])), )
+		results = None
+		if follow_insn is not None:
+			if follow_insn["cf"] == 0:
+				results = (("handle", str(follow_insn["eax"])), )
+			else:
+				results = (("error", self._decode_select(self._FILE_ERROR_CODES, follow_insn["eax"])), )
 		return DecodedSyscall(name = "CREATE", parameters = (
 			("filename", "%04x:%04x" % (insn["ds"], insn["edx"])),
 			("attributes", self._decode_select({
@@ -96,14 +98,12 @@ class Stracer():
 		), results = results)
 
 	def _handle_rdwrite(self, name, insn, follow_insn):
+		results = None
 		if follow_insn is not None:
-			result_al = insn["eax"] & 0xff
 			if follow_insn["cf"] == 0:
-				results = (("length", result_al), )
+				results = (("length", follow_insn["eax"]), )
 			else:
-				results = (("error", self._decode_select(self._FILE_ERROR_CODES, result_al)), )
-		else:
-			results = None
+				results = (("error", self._decode_select(self._FILE_ERROR_CODES, follow_insn["eax"])), )
 		return DecodedSyscall(name = name, parameters = (
 			("handle", "%d" % (insn["ebx"])),
 			("length", "%d" % (insn["ecx"])),
@@ -111,14 +111,12 @@ class Stracer():
 		), results = results)
 
 	def _handle_3d(self, insn, follow_insn):
+		results = None
 		if follow_insn is not None:
-			result_al = insn["eax"] & 0xff
 			if follow_insn["cf"] == 0:
-				results = (("handle", result_al), )
+				results = (("handle", follow_insn["eax"]), )
 			else:
-				results = (("error", self._decode_select(self._FILE_ERROR_CODES, result_al)), )
-		else:
-			results = None
+				results = (("error", self._decode_select(self._FILE_ERROR_CODES, follow_insn["eax"])), )
 		return DecodedSyscall(name = "OPEN", parameters = (
 			("mode", self._decode_select({
 				0: "read",
@@ -129,17 +127,14 @@ class Stracer():
 		), results = results)
 
 	def _handle_3e(self, insn, follow_insn):
+		results = None
 		if follow_insn is not None:
-			result_al = insn["eax"] & 0xff
 			if follow_insn["cf"] == 0:
 				results = (("success", True), )
 			else:
-				results = (("error", self._decode_select(self._FILE_ERROR_CODES, result_al)), )
-		else:
-			results = None
+				results = (("error", self._decode_select(self._FILE_ERROR_CODES, follow_insn["eax"])), )
 		return DecodedSyscall(name = "CLOSE", parameters = (
 			("handle", insn["ebx"]),
-			("filename", "%04x:%04x" % (insn["ds"], insn["edx"])),
 		), results = results)
 
 	def _handle_3f(self, insn, follow_insn):
@@ -147,6 +142,11 @@ class Stracer():
 
 	def _handle_40(self, insn, follow_insn):
 		return self._handle_rdwrite("WRITE", insn, follow_insn)
+
+	def _handle_4c(self, insn, follow_insn):
+		return DecodedSyscall(name = "EXIT", parameters = (
+			("returncode", insn["eax"] & 0xff),
+		))
 
 	def _handle_int21(self, insn, follow_insn):
 		ah = (insn["eax"] >> 8) & 0xff
@@ -161,11 +161,15 @@ class Stracer():
 			self._unknown_syscall_count[ah] += 1
 
 	def run(self):
-		for (insn, follow_insn) in zip(self._trace, self._trace[1:]):
-			if follow_insn["i"] != insn["i"] + 1:
-				# Followup instruction not available
-				follow_insn = None
+		for (insn_index, insn) in enumerate(self._trace):
 			if insn["opcode"] == "cd21":
+				follow_insn = None
+				for (candidate, next_candidate) in zip(self._trace[insn_index + 1 : insn_index + 10 ], self._trace[insn_index + 2 : ]):
+					# "iret" found
+					if candidate["opcode"] == "cf":
+						# Choose instruction following the iret for the return values
+						follow_insn = next_candidate
+						break
 				self._handle_int21(insn, follow_insn)
 
 		if self._args.verbose >= 1:

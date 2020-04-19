@@ -34,11 +34,15 @@ class TracefileFilter():
 		components = [ ]
 
 		if "syscall" in self._include:
+			# Int21 or instruction after iret (to capture return value)
 			followup_insn = 0
 			def predicate_syscall(insn):
 				nonlocal followup_insn
 				if insn["opcode"] == "cd21":
 					# Int21
+					return True
+				elif insn["opcode"] == "cf":
+					# Iret, capture /next/ instruction as well for return code
 					followup_insn = insn["i"] + 1
 					return True
 				return insn["i"] == followup_insn

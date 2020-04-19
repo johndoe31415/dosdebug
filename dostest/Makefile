@@ -17,3 +17,4 @@ install: all
 
 .s.com:
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+	objdump -b binary -m i386 -M i8086 --adjust-vma=0x100 -D $@
