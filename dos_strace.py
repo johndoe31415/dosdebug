@@ -24,45 +24,36 @@ import sys
 import json
 import time
 from FriendlyArgumentParser import FriendlyArgumentParser
+from Tracefile import Tracefile
 
 class Stracer():
 	def __init__(self, args):
 		self._args = args
-		self._trace = self._load_tracefile()
+		self._trace = Tracefile(self._args.infile, verbose = (self._args.verbose >= 1))
 
-	def _load_tracefile(self):
-		t0 = time.time()
-		with open(args.infile) as f:
-			trace = json.load(f)
-		t1 = time.time()
-		tdiff = t1 - t0
-		if self._args.verbose >= 1:
-			print("Loaded %d traced instructions in %.1f secs (%.0f insn/sec)" % (len(trace), tdiff, len(trace) / tdiff))
-		return trace
-
-	def _handle_int21(self, insn_no, insn, follow_insn):
+	def _handle_int21(self, insn, follow_insn):
 		ah = (insn["eax"] >> 8) & 0xff
 		if ah == 0x3d:
 			if follow_insn["cf"] == 0:
 				result = "handle %d" % (follow_insn["eax"])
 			else:
 				result = "failure error code 0x%02x" % (follow_insn["eax"])
-			print("%d: OPEN filename in %04x:%04x -> %s" % (insn_no, insn["ds"], insn["edx"], result))
+			print("%d: OPEN filename in %04x:%04x -> %s" % (insn["i"], insn["ds"], insn["edx"], result))
 		elif ah == 0x3e:
-			print("%d: CLOSE file %d" % (insn_no, insn["ebx"]))
+			print("%d: CLOSE file %d" % (insn["i"], insn["ebx"]))
 		elif ah == 0x3f:
-			print("%d: READ file %d, length %d, store in %04x:%04x" % (insn_no, insn["ebx"], insn["ecx"], insn["ds"], insn["edx"]))
+			print("%d: READ file %d, length %d, store in %04x:%04x" % (insn["i"], insn["ebx"], insn["ecx"], insn["ds"], insn["edx"]))
 		elif ah == 0x40:
-			print("%d: WRITE file %d, length %d, load from %04x:%04x" % (insn_no, insn["ebx"], insn["ecx"], insn["ds"], insn["edx"]))
+			print("%d: WRITE file %d, length %d, load from %04x:%04x" % (insn["i"], insn["ebx"], insn["ecx"], insn["ds"], insn["edx"]))
 		elif ah == 0x41:
-			print("%d: UNLINK filename in %04x:%04x" % (insn_no, insn["ds"], insn["edx"]))
+			print("%d: UNLINK filename in %04x:%04x" % (insn["i"], insn["ds"], insn["edx"]))
 		else:
-			print("%d: Unknown syscall AH = 0x%02x" % (insn_no, ah))
+			print("%d: Unknown syscall AH = 0x%02x" % (insn["i"], ah))
 
 	def run(self):
-		for (insn_no, (insn, follow_insn)) in enumerate(zip(self._trace, self._trace[1:]), 1):
+		for (insn, follow_insn) in zip(self._trace, self._trace[1:]):
 			if insn["opcode"] == "cd21":
-				self._handle_int21(insn_no, insn, follow_insn)
+				self._handle_int21(insn, follow_insn)
 
 parser = FriendlyArgumentParser(description = "Perform a DosBox system call trace on a trace log in JSON format.")
 parser.add_argument("-v", "--verbose", action = "count", default = 0, help = "Increases verbosity. Can be specified multiple times to increase.")
