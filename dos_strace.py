@@ -76,6 +76,7 @@ class Stracer():
 		self._args = args
 		self._trace = Tracefile(self._args.infile, verbose = (self._args.verbose >= 1))
 		self._unknown_syscall_count = collections.Counter()
+		self._filepos = { }
 
 	def _decode_select(self, options, value):
 		return options.get(value, "unknown (0x%x)" % (value))
@@ -98,23 +99,33 @@ class Stracer():
 		), results = results)
 
 	def _handle_rdwrite(self, name, insn, follow_insn):
+		handle = insn["ebx"]
+		parameters = [
+			("handle", "%d" % (handle)),
+			("length", "%d" % (insn["ecx"])),
+			("buffer", "%04x:%04x" % (insn["ds"], insn["edx"])),
+		]
+
 		results = None
 		if follow_insn is not None:
 			if follow_insn["cf"] == 0:
-				results = (("length", follow_insn["eax"]), )
+				length = follow_insn["eax"]
+				parameters.append(("old_offset", self._filepos[handle]))
+				if handle in self._filepos:
+					self._filepos[handle] += length
+				parameters.append(("new_offset", self._filepos[handle]))
+				results = (("length", length), )
 			else:
 				results = (("error", self._decode_select(self._FILE_ERROR_CODES, follow_insn["eax"])), )
-		return DecodedSyscall(name = name, parameters = (
-			("handle", "%d" % (insn["ebx"])),
-			("length", "%d" % (insn["ecx"])),
-			("buffer", "%04x:%04x" % (insn["ds"], insn["edx"])),
-		), results = results)
+		return DecodedSyscall(name = name, parameters = parameters, results = results)
 
 	def _handle_3d(self, insn, follow_insn):
 		results = None
 		if follow_insn is not None:
 			if follow_insn["cf"] == 0:
-				results = (("handle", follow_insn["eax"]), )
+				handle = follow_insn["eax"]
+				results = (("handle", handle), )
+				self._filepos[handle] = 0
 			else:
 				results = (("error", self._decode_select(self._FILE_ERROR_CODES, follow_insn["eax"])), )
 		return DecodedSyscall(name = "OPEN", parameters = (
@@ -133,8 +144,11 @@ class Stracer():
 				results = (("success", True), )
 			else:
 				results = (("error", self._decode_select(self._FILE_ERROR_CODES, follow_insn["eax"])), )
+		handle = insn["ebx"]
+		if handle in self._filepos:
+			del self._filepos[handle]
 		return DecodedSyscall(name = "CLOSE", parameters = (
-			("handle", insn["ebx"]),
+			("handle", handle),
 		), results = results)
 
 	def _handle_3f(self, insn, follow_insn):
