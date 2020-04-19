@@ -20,9 +20,11 @@
 #
 #	Johannes Bauer <JohannesBauer@gmx.de>
 
+import os
 import re
 import sys
 import json
+from FriendlyArgumentParser import FriendlyArgumentParser
 
 class REGenerator():
 	@classmethod
@@ -73,10 +75,9 @@ class REGenerator():
 class DosboxLogfile():
 	_TRACE_RE = REGenerator.compile(REGenerator.trace)
 
-	def __init__(self, filename):
-		self._filename = filename
+	def __init__(self, args):
+		self._args = args
 		self._trace = [ ]
-		self._parse()
 
 	def _parse_line(self, line):
 		result = self._TRACE_RE.fullmatch(line)
@@ -90,18 +91,38 @@ class DosboxLogfile():
 		result["opcode"] = result["opcode"].lower().replace(" ", "")
 		return result
 
-	def _parse(self):
-		with open(self._filename) as f:
+	def parse(self, filename):
+		filesize = os.stat(filename).st_size
+		pos = 0
+		with open(filename) as f:
 			for (lineno, line) in enumerate(f, 1):
-				if lineno % 10000 == 0:
-					print(lineno)
+				pos += len(line)
+				if lineno % 25000 == 0:
+					print("%s: %d lines processed, %.1f%%" % (filename, lineno, pos / filesize * 100))
+
+				if (self._args.start is not None) and (lineno < self._args.start):
+					continue
+
 				line = line.rstrip("\r\n")
 				insn = self._parse_line(line)
 				self._trace.append(insn)
+
+				if self._args.stop == lineno:
+					print("Stop condition reached, line %d." % (self._args.stop))
+					break
 
 	def write_json(self, jsonfile):
 		with open(jsonfile, "w") as f:
 			json.dump(self._trace, f, separators = (",", ":"))
 
-log = DosboxLogfile(sys.argv[1])
-log.write_json(sys.argv[2])
+parser = FriendlyArgumentParser(description = "Convert DosBox full trace to JSON format.")
+parser.add_argument("--start", metavar = "insn_no", type = int, help = "First line to include in tracefile. Defaults to 1.")
+parser.add_argument("--stop", metavar = "insn_no", type = int, help = "Last line to include in tracefile. Defaults to end of file.")
+parser.add_argument("-v", "--verbose", action = "count", default = 0, help = "Increases verbosity. Can be specified multiple times to increase.")
+parser.add_argument("infile", metavar = "infile", type = str, help = "Input trace file (typically called LOGCPU.TXT)")
+parser.add_argument("outfile", metavar = "outfile", type = str, help = "Output JSON file")
+args = parser.parse_args(sys.argv[1:])
+
+log = DosboxLogfile(args)
+log.parse(args.infile)
+log.write_json(args.outfile)
