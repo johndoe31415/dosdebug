@@ -81,6 +81,11 @@ class Stracer():
 	def _decode_select(self, options, value):
 		return options.get(value, "unknown (0x%x)" % (value))
 
+	def _handle_1a(self, insn, follow_insn):
+		return DecodedSyscall(name = "SET_DTA", parameters = (
+			("dta", "%04x:%04x" % (insn["ds"], insn["edx"])),
+		))
+
 	def _handle_3c(self, insn, follow_insn):
 		results = None
 		if follow_insn is not None:
