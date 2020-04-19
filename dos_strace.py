@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 #	doscheat - Python GDB commands for DOSBox debugging
-#	Copyright (C) 2020-2020 Johannes Bauer
 #
 #	This file is part of doscheat.
 #
@@ -23,37 +22,158 @@
 import sys
 import json
 import time
+import collections
 from FriendlyArgumentParser import FriendlyArgumentParser
 from Tracefile import Tracefile
 
+class DecodedSyscall():
+	def __init__(self, name, parameters = None, results = None):
+		self._name = name
+		self._parameters = parameters
+		self._results = results
+
+	@property
+	def name(self):
+		return self._name
+
+	@property
+	def parameters(self):
+		return self._parameters
+
+	@property
+	def parameter_string(self):
+		return ", ".join("%s = %s" % (key, value) for (key, value) in self.parameters)
+
+	@property
+	def results(self):
+		return self._results
+
+	@property
+	def result_string(self):
+		return ", ".join("%s = %s" % (key, value) for (key, value) in self.results)
+
+	def __str__(self):
+		text = [ self.name ]
+		if self.parameters is not None:
+			text.append(" ")
+			text.append(self.parameter_string)
+		if self.results is not None:
+			text.append(" -> ")
+			text.append(self.result_string)
+		return "".join(text)
+
 class Stracer():
+	_FILE_ERROR_CODES = {
+		2:	"file not found",
+		3:	"path not found",
+		4:	"no handle available",
+		5:	"access denied",
+		6:	"invalid handle",
+		12:	"access code invalid",
+	}
+
 	def __init__(self, args):
 		self._args = args
 		self._trace = Tracefile(self._args.infile, verbose = (self._args.verbose >= 1))
+		self._unknown_syscall_count = collections.Counter()
+
+	def _decode_select(self, options, value):
+		return options.get(value, "unknown (0x%x)" % (value))
+
+	def _handle_3c(self, insn, follow_insn):
+		if follow_insn["cf"] == 0:
+			results = (("handle", str(insn["eax"])), )
+		else:
+			results = (("error", self._decode_select(self._FILE_ERROR_CODES, insn["eax"])), )
+		return DecodedSyscall(name = "CREATE", parameters = (
+			("filename", "%04x:%04x" % (insn["ds"], insn["edx"])),
+			("attributes", self._decode_select({
+				0: "normal",
+				1: "read only",
+				2: "hidden",
+				3: "system",
+			}, insn["ecx"])),
+		), results = results)
+
+	def _handle_rdwrite(self, name, insn, follow_insn):
+		if follow_insn is not None:
+			result_al = insn["eax"] & 0xff
+			if follow_insn["cf"] == 0:
+				results = (("length", result_al), )
+			else:
+				results = (("error", self._decode_select(self._FILE_ERROR_CODES, result_al)), )
+		else:
+			results = None
+		return DecodedSyscall(name = name, parameters = (
+			("handle", "%d" % (insn["ebx"])),
+			("length", "%d" % (insn["ecx"])),
+			("buffer", "%04x:%04x" % (insn["ds"], insn["edx"])),
+		), results = results)
+
+	def _handle_3d(self, insn, follow_insn):
+		if follow_insn is not None:
+			result_al = insn["eax"] & 0xff
+			if follow_insn["cf"] == 0:
+				results = (("handle", result_al), )
+			else:
+				results = (("error", self._decode_select(self._FILE_ERROR_CODES, result_al)), )
+		else:
+			results = None
+		return DecodedSyscall(name = "OPEN", parameters = (
+			("mode", self._decode_select({
+				0: "read",
+				1: "write",
+				2: "read/write"
+			}, insn["eax"] & 0xff)),
+			("filename", "%04x:%04x" % (insn["ds"], insn["edx"])),
+		), results = results)
+
+	def _handle_3e(self, insn, follow_insn):
+		if follow_insn is not None:
+			result_al = insn["eax"] & 0xff
+			if follow_insn["cf"] == 0:
+				results = (("success", True), )
+			else:
+				results = (("error", self._decode_select(self._FILE_ERROR_CODES, result_al)), )
+		else:
+			results = None
+		return DecodedSyscall(name = "CLOSE", parameters = (
+			("handle", insn["ebx"]),
+			("filename", "%04x:%04x" % (insn["ds"], insn["edx"])),
+		), results = results)
+
+	def _handle_3f(self, insn, follow_insn):
+		return self._handle_rdwrite("READ", insn, follow_insn)
+
+	def _handle_40(self, insn, follow_insn):
+		return self._handle_rdwrite("WRITE", insn, follow_insn)
 
 	def _handle_int21(self, insn, follow_insn):
 		ah = (insn["eax"] >> 8) & 0xff
-		if ah == 0x3d:
-			if follow_insn["cf"] == 0:
-				result = "handle %d" % (follow_insn["eax"])
-			else:
-				result = "failure error code 0x%02x" % (follow_insn["eax"])
-			print("%d: OPEN filename in %04x:%04x -> %s" % (insn["i"], insn["ds"], insn["edx"], result))
-		elif ah == 0x3e:
-			print("%d: CLOSE file %d" % (insn["i"], insn["ebx"]))
-		elif ah == 0x3f:
-			print("%d: READ file %d, length %d, store in %04x:%04x" % (insn["i"], insn["ebx"], insn["ecx"], insn["ds"], insn["edx"]))
-		elif ah == 0x40:
-			print("%d: WRITE file %d, length %d, load from %04x:%04x" % (insn["i"], insn["ebx"], insn["ecx"], insn["ds"], insn["edx"]))
-		elif ah == 0x41:
-			print("%d: UNLINK filename in %04x:%04x" % (insn["i"], insn["ds"], insn["edx"]))
+		al = (insn["eax"] >> 0) & 0xff
+		handler_name = "_handle_%02x" % (ah)
+		handler = getattr(self, handler_name, None)
+		if handler is not None:
+			decoded = handler(insn, follow_insn)
+			print("%d: [%02x] %s" % (insn["i"], ah, str(decoded)))
 		else:
-			print("%d: Unknown syscall AH = 0x%02x" % (insn["i"], ah))
+			print("%d: [%02x] Unknown syscall" % (insn["i"], ah))
+			self._unknown_syscall_count[ah] += 1
 
 	def run(self):
 		for (insn, follow_insn) in zip(self._trace, self._trace[1:]):
+			if follow_insn["i"] != insn["i"] + 1:
+				# Followup instruction not available
+				follow_insn = None
 			if insn["opcode"] == "cd21":
 				self._handle_int21(insn, follow_insn)
+
+		if self._args.verbose >= 1:
+			if len(self._unknown_syscall_count) > 0:
+				print()
+				print("Unknown syscalls encountered:")
+				for (ah, count) in self._unknown_syscall_count.most_common():
+					print("   %5d 0x%02x" % (count, ah))
 
 parser = FriendlyArgumentParser(description = "Perform a DosBox system call trace on a trace log in JSON format.")
 parser.add_argument("-v", "--verbose", action = "count", default = 0, help = "Increases verbosity. Can be specified multiple times to increase.")
