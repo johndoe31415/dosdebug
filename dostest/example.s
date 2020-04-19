@@ -1,0 +1,8 @@
+.code16gcc
+
+mov $'X', %dl
+mov $0x02, %ah
+int $0x21
+
+mov $0x4c00, %ax
+int $0x21
