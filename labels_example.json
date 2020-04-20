@@ -1,0 +1,13 @@
+{
+	"tracepoints": {
+		"2451090": "read_data",
+		"2451224": "read_crc",
+		"2451291": "close_file"
+	},
+	"addresses": {
+		"1a5:1234":	"start_decode",
+		"1a5:1444":	"encoding_wrong",
+		"1a5:1460":	"encoding_correct",
+		"0x3d236":	"global_state"
+	}
+}
