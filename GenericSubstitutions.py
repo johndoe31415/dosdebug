@@ -23,7 +23,6 @@
 from Tracefile import TracepointRegex
 
 class InstructionSubstitute():
-	_MUL32_ENTRY = "2A74:363C"
 	_SUPPORTED_OPTIONS = [ "mul32-entry" ]
 
 	def __init__(self, options, trace):
