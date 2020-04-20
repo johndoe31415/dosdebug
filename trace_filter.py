@@ -58,7 +58,7 @@ class TracefileFilter():
 		trace.write(self._args.outfile)
 
 parser = FriendlyArgumentParser(description = "Filter a DosBox full trace file to JSON format.")
-parser.add_argument("-i", "--include", choices = [ "all", "syscall" ], action = "append", default = [ ], required = True, help = "Include which portions of the original trace file. Can be any of %(choices)s and can be specified multiple times.")
+parser.add_argument("-i", "--include", choices = [ "all", "syscall" ], action = "append", default = [ ], required = True, help = "Include which portions of the original trace file. Can be any of %(choices)s and can be specified multiple times. Must be given at least once.")
 parser.add_argument("--start", metavar = "insn_no", type = int, help = "First instruction to include in tracefile. Defaults to 1.")
 parser.add_argument("--stop", metavar = "insn_no", type = int, help = "Last instruction to include in tracefile. Defaults to last instruction.")
 parser.add_argument("-v", "--verbose", action = "count", default = 0, help = "Increases verbosity. Can be specified multiple times to increase.")
